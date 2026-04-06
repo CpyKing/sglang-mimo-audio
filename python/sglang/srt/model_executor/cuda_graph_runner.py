@@ -149,10 +149,15 @@ class DecodeInputBuffers(ForwardInputBuffers):
         cache_loc_dtype: torch.dtype,
         enable_mamba_track: bool,
         ne_token_table: Optional[torch.Tensor] = None,
+        is_mimo_audio: bool = False,
     ) -> "DecodeInputBuffers":
         with torch.device(device):
-            input_ids = torch.zeros((max_num_token,), dtype=torch.int64)
-            input_embeds = torch.zeros((max_num_token, hidden_size), dtype=dtype)
+            if is_mimo_audio:
+                input_ids = torch.zeros((max_num_token, 4 * 9), dtype=torch.int64)
+                input_embeds = torch.zeros((max_num_token, hidden_size), dtype=dtype)
+            else:
+                input_ids = torch.zeros((max_num_token,), dtype=torch.int64)
+                input_embeds = torch.zeros((max_num_token, hidden_size), dtype=dtype)
             req_pool_indices = torch.zeros((max_bs,), dtype=torch.int64)
             seq_lens = torch.full((max_bs,), seq_len_fill_value, dtype=torch.int32)
             out_cache_loc = torch.zeros((max_num_token,), dtype=cache_loc_dtype)
@@ -254,6 +259,7 @@ class DecodeInputBuffers(ForwardInputBuffers):
         nsa_enable_prefill_cp: bool,
         enable_num_token_non_padded_flag: bool,
         pp_proxy_tensors: Optional[PPProxyTensors] = None,
+        is_mimo_audio: bool = False,
     ):
         if bs != raw_bs:
             self.seq_lens.fill_(seq_len_fill_value)
@@ -264,6 +270,7 @@ class DecodeInputBuffers(ForwardInputBuffers):
                 self.mamba_track_mask.fill_(False)
 
         # Build batched copy lists for all GPU tensors.
+
         dsts = [
             self.input_ids[:raw_num_token],
             self.req_pool_indices[:raw_bs],
@@ -287,6 +294,10 @@ class DecodeInputBuffers(ForwardInputBuffers):
             self.ngram_embedding_info.req_lens[:raw_bs].copy_(
                 ngram_embedding_info.req_lens
             )
+
+        if is_mimo_audio:
+            dsts.append(self.input_embeds[:raw_num_token])
+            srcs.append(forward_batch.input_embeds)
 
         if (
             self.mamba_track_indices is not None
@@ -333,7 +344,6 @@ class DecodeInputBuffers(ForwardInputBuffers):
                 dim = src.shape[0]
                 dsts.append(buf[:dim])
                 srcs.append(src)
-
         # Batch all GPU copies, grouped by dtype pair.
         _grouped_foreach_copy_(dsts, srcs)
 
@@ -615,6 +625,8 @@ class CudaGraphRunner:
             ne_token_table=(
                 model_runner.token_table if self.use_ngram_embedding else None
             ),
+            is_mimo_audio="MiMoAudioModel"
+            in self.model_runner.model_config.hf_config.architectures,
         )
         self.buffers.share_buffers()
 
@@ -826,6 +838,7 @@ class CudaGraphRunner:
 
         # Graph inputs
         input_ids = buffers.input_ids[:num_tokens]
+        input_embeds = buffers.input_embeds[:num_tokens]
         req_pool_indices = buffers.req_pool_indices[:bs]
         seq_lens = buffers.seq_lens[:bs]
         seq_lens_cpu = buffers.seq_lens_cpu[:bs]
@@ -981,11 +994,11 @@ class CudaGraphRunner:
                 kwargs["pp_proxy_tensors"] = PPProxyTensors(
                     {k: v.clone() for k, v in pp_proxy_tensors.tensors.items()}
                 )
-
             logits_output_or_pp_proxy_tensors = forward(
                 input_ids,
                 forward_batch.positions,
                 forward_batch,
+                input_embeds,
                 **kwargs,
             )
             return logits_output_or_pp_proxy_tensors
@@ -1077,6 +1090,8 @@ class CudaGraphRunner:
                 self.model_runner.server_args
             ),
             pp_proxy_tensors=pp_proxy_tensors,
+            is_mimo_audio="MiMoAudioModel"
+            in self.model_runner.model_config.hf_config.architectures,
         )
         if self.enable_two_batch_overlap:
             self.tbo_plugin.replay_prepare(

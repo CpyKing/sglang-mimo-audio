@@ -251,6 +251,16 @@ class PiecewiseCudaGraphRunner:
                 input_embeds = None
                 mrope_positions = None
 
+            if (
+                "MiMoAudioModel"
+                in self.model_runner.model_config.hf_config.architectures
+            ):
+                input_ids = torch.zeros((self.max_num_tokens, 4 * 9), dtype=torch.int64)
+                input_embeds = torch.zeros(
+                    (self.max_num_tokens, self.model_runner.model_config.hidden_size),
+                    dtype=self.model_runner.dtype,
+                )
+
         self.buffers = PrefillInputBuffers(
             input_ids=input_ids,
             out_cache_loc=out_cache_loc,
@@ -320,6 +330,12 @@ class PiecewiseCudaGraphRunner:
         buffers = self.buffers
         input_ids = buffers.input_ids[:num_tokens]
         input_embeds = buffers.input_embeds[:num_tokens] if self.is_multimodal else None
+        input_embeds = (
+            buffers.input_embeds[:num_tokens]
+            if "MiMoAudioModel"
+            in self.model_runner.model_config.hf_config.architectures
+            else input_embeds
+        )
         positions = buffers.positions[:num_tokens]
         mrope_positions = (
             buffers.mrope_positions[:, :num_tokens] if self.is_multimodal else None
@@ -400,10 +416,16 @@ class PiecewiseCudaGraphRunner:
             self.moe_layers,
             self.moe_fusions,
         ):
+            if (
+                "MiMoAudioModel"
+                in self.model_runner.model_config.hf_config.architectures
+            ):
+                input_embeds = forward_batch.input_embeds
             _ = self.model_runner.model.forward(
                 forward_batch.input_ids,
                 forward_batch.positions,
                 forward_batch,
+                input_embeds=input_embeds,
             )
 
     def _cache_loc_dtype(self):
@@ -466,6 +488,12 @@ class PiecewiseCudaGraphRunner:
         # Graph inputs
         input_ids = buffers.input_ids[:num_tokens]
         input_embeds = buffers.input_embeds[:num_tokens] if self.is_multimodal else None
+        input_embeds = (
+            buffers.input_embeds[:num_tokens]
+            if "MiMoAudioModel"
+            in self.model_runner.model_config.hf_config.architectures
+            else input_embeds
+        )
 
         out_cache_loc = buffers.out_cache_loc[:num_tokens]
         out_cache_loc_swa = (
@@ -501,7 +529,6 @@ class PiecewiseCudaGraphRunner:
             lora_ids = [None] * bs
         else:
             lora_ids = None
-
         with torch.device(self.device):
             forward_batch = ForwardBatch(
                 forward_mode=ForwardMode.EXTEND,
@@ -565,6 +592,11 @@ class PiecewiseCudaGraphRunner:
             set_is_extend_in_batch(False)
 
             kwargs = {}
+            if (
+                "MiMoAudioModel"
+                in self.model_runner.model_config.hf_config.architectures
+            ):
+                kwargs["input_embeds"] = forward_batch.input_embeds
             with set_forward_context(
                 forward_batch,
                 self.attention_layers,

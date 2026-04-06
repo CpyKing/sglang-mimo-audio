@@ -13,8 +13,9 @@ class MiMoAudioInfer:
         self.llm_engine = sgl.Engine(
             model_path=model_path,
             disable_radix_cache=True,
-            disable_piecewise_cuda_graph=True,
-            disable_cuda_graph=True,
+            # disable_piecewise_cuda_graph=True,
+            cuda_graph_max_bs=16,
+            # disable_cuda_graph=True,
             disable_overlap_schedule=True,
             #  attention_backend="torch_native"
         )
@@ -80,11 +81,15 @@ class MiMoAudioInfer:
         )  # shape [1, 13464] [seq_len, group_size, audio_channel + 1]
         input_ids = [MiMoAudioMMId.init_new(mm) for mm in input_ids]
 
+        import time
+
+        start_stamp = time.time()
         output = self.llm_engine.generate(
             input_ids=input_ids,
             sampling_params=sampling_params,
             # stream=True,
         )
+        print("Generate time:\t", time.time() - start_stamp, " s")
 
         # prev_length = 0
         # import sys
@@ -118,7 +123,7 @@ class MiMoAudioInfer:
             .replace("<|eot|>", "")
             .replace("<|eostm|>", "")
         )
-        print("Text channel:\t", detokenized_text)
+        # print("Text channel:\t", detokenized_text)
 
         if output_audio_path:
             return_audio = True
@@ -203,5 +208,6 @@ if __name__ == "__main__":
     # output_audio_path = "examples/tts.wav"
 
     mimo_audio_infer = MiMoAudioInfer(model_path, mimo_audio_tokenizer_path)
-    result = mimo_audio_infer.audio_understanding_sft(audio_path, text)
+    for _ in range(10):
+        result = mimo_audio_infer.audio_understanding_sft(audio_path, text)
     # result = mimo_audio_infer.tts_sft(output_audio_path, text)

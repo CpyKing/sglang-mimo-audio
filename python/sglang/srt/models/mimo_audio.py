@@ -292,6 +292,15 @@ class MiMoAudioForCausalLM(nn.Module):
     def get_input_embeddings(self, input_ids: torch.Tensor) -> torch.Tensor:
         return self.model.get_input_embeddings(input_ids)
 
+    def prepare_mm_input_embeds(self, input_ids: torch.Tensor) -> torch.Tensor:
+        input_ids = input_ids.view(1, -1, 9).transpose(
+            -1, -2
+        )  # [B, audio_channels + 1, new_T]
+        input_embeds = self._prepare_input_embeds(input_ids)
+        input_embeds = input_embeds.squeeze(0)  # 去掉 第一个 B 维度
+
+        return input_embeds
+
     @torch.no_grad()
     def forward(
         self,
@@ -302,15 +311,8 @@ class MiMoAudioForCausalLM(nn.Module):
         get_embedding: bool = False,
     ) -> torch.Tensor:
         # forward_batch.capture_hidden_mode = CaptureHiddenMode.LAST
-        input_ids = input_ids.view(1, -1, 9).transpose(
-            -1, -2
-        )  # [B, audio_channels + 1, new_T]
-        input_embeds = self._prepare_input_embeds(input_ids)
-        # forward_batch.num_token_non_padded_cpu=input_embeds.shape[1]
-        input_ids = None
-        # positions = None
-        input_embeds = input_embeds.squeeze(0)  # 去掉 第一个 B 维度
-        # positions = torch.arange(input_embeds.shape[0]).to("cuda") # 暂时添加 positions
+
+        # input_embeds is [374, 4096] [seq_len, hidden_size]
         outputs = self.model(input_ids, positions, forward_batch, input_embeds)
 
         hidden_states = (

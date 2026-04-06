@@ -2213,7 +2213,6 @@ class ModelRunner(ModelRunnerKVCacheMixin):
     def init_piecewise_cuda_graphs(self):
         """Initialize piecewise CUDA graph runner."""
         self.piecewise_cuda_graph_runner = None
-        # self.server_args.disable_piecewise_cuda_graph = True
 
         if self.server_args.disable_piecewise_cuda_graph:
             logger.info(
@@ -2360,6 +2359,11 @@ class ModelRunner(ModelRunnerKVCacheMixin):
         kwargs = {}
         if self.support_pp:
             kwargs["pp_proxy_tensors"] = pp_proxy_tensors
+        if "MiMoAudioModel" in self.model_config.hf_config.architectures:
+            mm_input_embeds = self.model.prepare_mm_input_embeds(
+                forward_batch.input_ids
+            )
+            kwargs["input_embeds"] = mm_input_embeds.bfloat16()
         return self.model.forward(
             forward_batch.input_ids,
             forward_batch.positions,
@@ -2396,7 +2400,11 @@ class ModelRunner(ModelRunnerKVCacheMixin):
 
         if not skip_attn_backend_init:
             self.attn_backend.init_forward_metadata(forward_batch)
-
+        if "MiMoAudioModel" in self.model_config.hf_config.architectures:
+            mm_input_embeds = self.model.prepare_mm_input_embeds(
+                forward_batch.input_ids
+            )
+            kwargs["input_embeds"] = mm_input_embeds.bfloat16()
         return (
             self.model.forward(
                 forward_batch.input_ids,
@@ -2526,6 +2534,11 @@ class ModelRunner(ModelRunnerKVCacheMixin):
         )
 
         if can_run_graph:
+            if "MiMoAudioModel" in self.model_config.hf_config.architectures:
+                mm_input_embeds = self.model.prepare_mm_input_embeds(
+                    forward_batch.input_ids
+                )
+                forward_batch.input_embeds = mm_input_embeds
             ret = self.graph_runner.replay(
                 forward_batch,
                 skip_attn_backend_init=skip_attn_backend_init,
