@@ -1082,6 +1082,7 @@ class FlashInferIndicesUpdaterDecode:
         fixed_split_size: Optional[int] = None,
         disable_split_kv: Optional[bool] = None,
     ):
+        # import rpdb;rpdb.set_trace("0.0.0.0", 5555)
         if spec_info is None:
             bs = len(req_pool_indices)
             kv_indptr[1 : bs + 1] = torch.cumsum(paged_kernel_lens, dim=0)
@@ -1371,6 +1372,7 @@ class FlashInferIndicesUpdaterPrefill:
         multi_item_params: Optional[MultiItemScoringParams] = None,
     ):
         bs = len(seq_lens)
+        # import rpdb;rpdb.set_trace("0.0.0.0", 5555)
         if spec_info is None:
             assert len(seq_lens) == len(req_pool_indices)
             # Normal extend

@@ -683,6 +683,7 @@ class DefaultModelLoader(BaseModelLoader):
 
     @staticmethod
     def load_weights_and_postprocess(model, weights, target_device):
+        # return
         model.load_weights(weights)
 
         for _, module in model.named_modules():

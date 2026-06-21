@@ -13,10 +13,11 @@ class MiMoAudioInfer:
         self.llm_engine = sgl.Engine(
             model_path=model_path,
             disable_radix_cache=True,
-            # disable_piecewise_cuda_graph=True,
-            cuda_graph_max_bs=16,
-            # disable_cuda_graph=True,
+            disable_piecewise_cuda_graph=True,
+            # cuda_graph_max_bs=16,
+            disable_cuda_graph=True,
             disable_overlap_schedule=True,
+            # page_size=16,
             #  attention_backend="torch_native"
         )
         self.mimo_audio = MimoAudio(
@@ -123,7 +124,7 @@ class MiMoAudioInfer:
             .replace("<|eot|>", "")
             .replace("<|eostm|>", "")
         )
-        # print("Text channel:\t", detokenized_text)
+        print("Text channel:\t", detokenized_text)
 
         if output_audio_path:
             return_audio = True
@@ -196,8 +197,10 @@ class MiMoAudioInfer:
 
 
 if __name__ == "__main__":
-    model_path = "/mnt/lustre-client/ALL_MODELS/MiMo-Audio-7B-Instruct"
-    mimo_audio_tokenizer_path = "/mnt/lustre-client/ALL_MODELS/MiMo-Audio-Tokenizer"
+    model_path = "/mnt/lustre-client/zhangzizheng/ALL_MODELS/MiMo-Audio-7B-Instruct"
+    mimo_audio_tokenizer_path = (
+        "/mnt/lustre-client/zhangzizheng/ALL_MODELS/MiMo-Audio-Tokenizer"
+    )
 
     # audio understanding
     audio_path = "examples/spoken_dialogue_assistant_turn_1.wav"

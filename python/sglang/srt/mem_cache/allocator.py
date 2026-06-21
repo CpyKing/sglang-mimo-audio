@@ -142,6 +142,7 @@ class TokenToKVPoolAllocator(BaseTokenToKVPoolAllocator):
         return len(self.free_pages) + len(self.release_pages)
 
     def alloc(self, need_size: int):
+        # import rpdb; rpdb.set_trace("0.0.0.0", 5555)
         if self.need_sort and need_size > len(self.free_pages):
             self.merge_and_sort_free()
 
@@ -378,6 +379,7 @@ class PagedTokenToKVPoolAllocator(BaseTokenToKVPoolAllocator):
         self.clear()
 
     def alloc(self, need_size: int):
+        # import rpdb; rpdb.set_trace("0.0.0.0", 5555)
         # page-aligned allocation, returning contiguous indices of pages
         if self.debug_mode:
             assert (
@@ -409,6 +411,7 @@ class PagedTokenToKVPoolAllocator(BaseTokenToKVPoolAllocator):
         last_loc: torch.Tensor,
         extend_num_tokens: int,
     ):
+        # import rpdb; rpdb.set_trace("0.0.0.0", 5555)
         if self.debug_mode:
             assert torch.all(
                 (last_loc + 1) % self.page_size == prefix_lens % self.page_size
@@ -454,6 +457,7 @@ class PagedTokenToKVPoolAllocator(BaseTokenToKVPoolAllocator):
         seq_lens_cpu: torch.Tensor,
         last_loc: torch.Tensor,
     ):
+        # import rpdb; rpdb.set_trace("0.0.0.0", 5555)
         if self.debug_mode:
             assert torch.all(
                 (last_loc + 2) % self.page_size == seq_lens % self.page_size
